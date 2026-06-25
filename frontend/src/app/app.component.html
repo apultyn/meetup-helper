@@ -29,14 +29,14 @@
         <label>
           <span class="label-title">
             Od
-            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Od" title="...">?</button>
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Od" title="Od kiedy szukać terminu">?</button>
           </span>
           <input name="start_date" type="date" required [(ngModel)]="createForm.start_date">
         </label>
         <label>
           <span class="label-title">
             Do
-            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Do" title="...">?</button>
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Do" title="Do kiedy szukać terminu">?</button>
           </span>
           <input name="end_date" type="date" required [(ngModel)]="createForm.end_date">
         </label>
@@ -45,14 +45,14 @@
         <label>
           <span class="label-title">
             Długość w dniach
-            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Długość w dniach" title="...">?</button>
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Długość w dniach" title="Ile ma trwać wydarzenie">?</button>
           </span>
           <input name="duration_days" type="number" min="1" max="365" required [(ngModel)]="createForm.duration_days">
         </label>
         <label>
           <span class="label-title">
             Twój login
-            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Twój login" title="...">?</button>
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Twój login" title="Login dla danego wydarzenia">?</button>
           </span>
           <input name="author_login" required maxlength="80" [(ngModel)]="createForm.author_login">
         </label>
@@ -60,7 +60,7 @@
       <button class="primary-button" type="submit" [disabled]="loading">Stwórz wydarzenie</button>
     </form>
 
-    <form class="panel" (ngSubmit)="joinEvent()">
+    <form class="panel" (ngSubmit)="prepareJoinEvent()">
       <h2>Dołącz po kodzie</h2>
       <label>
         Kod wydarzenia
@@ -73,6 +73,28 @@
       <button class="primary-button" type="submit" [disabled]="loading">Wejdź do wydarzenia</button>
       <p class="helper-text">Jeśli login już istnieje, zobaczysz i zmienisz jego deklaracje bez hasła.</p>
     </form>
+  </section>
+
+  <section class="modal-backdrop" *ngIf="pendingJoin as join" aria-labelledby="join-confirmation-title" aria-modal="true" role="dialog">
+    <div class="modal-panel">
+      <h2 id="join-confirmation-title">Potwierdź wejście</h2>
+      <p *ngIf="join.isExistingParticipant; else newParticipantMessage">
+        Logujesz się jako <strong class="modal-login">{{ join.login }}</strong>.
+      </p>
+      <ng-template #newParticipantMessage>
+        <p>
+          Dołączasz do wydarzenia jako nowy użytkownik <strong class="modal-login">{{ join.login }}</strong>.
+        </p>
+      </ng-template>
+      <div class="modal-actions">
+        <button type="button" class="ghost-button" (click)="cancelJoinConfirmation()" [disabled]="loading">
+          Anuluj
+        </button>
+        <button type="button" class="primary-button" (click)="confirmJoinEvent()" [disabled]="loading || joinConfirmationSeconds > 0">
+          {{ joinConfirmationSeconds > 0 ? 'Kontynuuj za ' + joinConfirmationSeconds + ' s' : 'Kontynuuj' }}
+        </button>
+      </div>
+    </div>
   </section>
 
   <ng-container *ngIf="event as activeEvent">

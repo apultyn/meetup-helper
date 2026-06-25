@@ -289,6 +289,46 @@ textarea {
   font-weight: 800;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16, 32, 29, 0.36);
+}
+
+.modal-panel {
+  width: min(100%, 420px);
+  border-radius: 8px;
+  padding: 22px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(16, 32, 29, 0.24);
+}
+
+.modal-panel h2 {
+  margin: 0 0 12px;
+  color: #10201d;
+}
+
+.modal-panel p {
+  margin: 0;
+  color: #34403d;
+  font-weight: 700;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions .primary-button {
+  min-width: 154px;
+}
+
 @media (max-width: 860px) {
   .topbar,
   .event-header {
@@ -306,5 +346,11 @@ textarea {
   .app-shell {
     width: min(100% - 20px, 1180px);
     padding-top: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .modal-actions {
+    display: grid;
   }
 }

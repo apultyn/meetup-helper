@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -17,6 +17,12 @@ interface CalendarMonth {
   days: CalendarDay[];
 }
 
+interface PendingJoin {
+  code: string;
+  login: string;
+  isExistingParticipant: boolean;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -24,7 +30,7 @@ interface CalendarMonth {
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   createForm = {
     name: '',
     description: '',
@@ -52,8 +58,15 @@ export class AppComponent {
   loading = false;
   error = '';
   notice = '';
+  pendingJoin: PendingJoin | null = null;
+  joinConfirmationSeconds = 0;
+  private joinConfirmationTimerId: number | null = null;
 
   constructor(private readonly api: ApiService) {}
+
+  ngOnDestroy(): void {
+    this.clearJoinCountdown();
+  }
 
   get currentParticipant(): Participant | null {
     if (!this.event || !this.currentLogin) {
@@ -106,15 +119,29 @@ export class AppComponent {
     });
   }
 
-  joinEvent(): void {
-    this.runRequest(() => {
-      const code = this.joinForm.code.trim().toUpperCase();
-      const login = this.joinForm.login.trim();
+  prepareJoinEvent(): void {
+    const code = this.joinForm.code.trim().toUpperCase();
+    const login = this.joinForm.login.trim();
 
-      this.api.joinEvent(code, { login }).subscribe({
+    if (!code || !login) {
+      this.error = 'Podaj kod wydarzenia i login.';
+      return;
+    }
+
+    this.closeJoinConfirmation();
+
+    this.runRequest(() => {
+      this.api.getEvent(code).subscribe({
         next: (event) => {
-          this.setActiveEvent(event, login);
-          this.notice = `Jesteś w wydarzeniu jako ${login}.`;
+          const loginKey = login.toLocaleLowerCase('pl-PL');
+          this.pendingJoin = {
+            code,
+            login,
+            isExistingParticipant: event.participants.some(
+              (participant) => participant.login.toLocaleLowerCase('pl-PL') === loginKey
+            )
+          };
+          this.startJoinCountdown();
           this.loading = false;
         },
         error: (error: HttpErrorResponse) => this.handleError(error)
@@ -122,10 +149,39 @@ export class AppComponent {
     });
   }
 
+  confirmJoinEvent(): void {
+    if (!this.pendingJoin || this.joinConfirmationSeconds > 0) {
+      return;
+    }
+
+    const pendingJoin = this.pendingJoin;
+    this.clearJoinCountdown();
+
+    this.runRequest(() => {
+      this.api.joinEvent(pendingJoin.code, { login: pendingJoin.login }).subscribe({
+        next: (event) => {
+          this.pendingJoin = null;
+          this.setActiveEvent(event, pendingJoin.login);
+          this.notice = pendingJoin.isExistingParticipant
+            ? `Zalogowano jako ${pendingJoin.login}.`
+            : `Dołączono do wydarzenia jako ${pendingJoin.login}.`;
+          this.loading = false;
+        },
+        error: (error: HttpErrorResponse) => this.handleError(error)
+      });
+    });
+  }
+
+  cancelJoinConfirmation(): void {
+    this.closeJoinConfirmation();
+    this.loading = false;
+  }
+
   logout(): void {
     this.event = null;
     this.currentLogin = '';
     this.calendarMonths = [];
+    this.closeJoinConfirmation();
     this.newBlockerDate = '';
     this.newBlockerRange = {
       start_date: '',
@@ -281,6 +337,33 @@ export class AppComponent {
     this.error = '';
     this.notice = '';
     start();
+  }
+
+  private startJoinCountdown(): void {
+    this.clearJoinCountdown();
+    this.joinConfirmationSeconds = 5;
+    this.joinConfirmationTimerId = window.setInterval(() => {
+      if (this.joinConfirmationSeconds <= 1) {
+        this.clearJoinCountdown();
+        return;
+      }
+
+      this.joinConfirmationSeconds -= 1;
+    }, 1000);
+  }
+
+  private clearJoinCountdown(): void {
+    if (this.joinConfirmationTimerId !== null) {
+      window.clearInterval(this.joinConfirmationTimerId);
+      this.joinConfirmationTimerId = null;
+    }
+
+    this.joinConfirmationSeconds = 0;
+  }
+
+  private closeJoinConfirmation(): void {
+    this.pendingJoin = null;
+    this.clearJoinCountdown();
   }
 
   private handleError(error: HttpErrorResponse): void {

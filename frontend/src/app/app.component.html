@@ -1,0 +1,213 @@
+<main class="app-shell">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Meetup Helper</p>
+      <h1>Znajdź termin, który pasuje wszystkim</h1>
+    </div>
+    <button type="button" class="ghost-button" (click)="refreshEvent()" [disabled]="!event || loading">
+      Odśwież
+    </button>
+  </section>
+
+  <section class="alerts" aria-live="polite">
+    <p class="alert error" *ngIf="error">{{ error }}</p>
+    <p class="alert notice" *ngIf="notice">{{ notice }}</p>
+  </section>
+
+  <section class="start-grid" *ngIf="!event">
+    <form class="panel" (ngSubmit)="createEvent()">
+      <h2>Nowe wydarzenie</h2>
+      <label>
+        Nazwa
+        <input name="name" required maxlength="160" [(ngModel)]="createForm.name">
+      </label>
+      <label>
+        Opis
+        <textarea name="description" rows="4" maxlength="3000" [(ngModel)]="createForm.description"></textarea>
+      </label>
+      <div class="form-row">
+        <label>
+          <span class="label-title">
+            Od
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Od" title="...">?</button>
+          </span>
+          <input name="start_date" type="date" required [(ngModel)]="createForm.start_date">
+        </label>
+        <label>
+          <span class="label-title">
+            Do
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Do" title="...">?</button>
+          </span>
+          <input name="end_date" type="date" required [(ngModel)]="createForm.end_date">
+        </label>
+      </div>
+      <div class="form-row">
+        <label>
+          <span class="label-title">
+            Długość w dniach
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Długość w dniach" title="...">?</button>
+          </span>
+          <input name="duration_days" type="number" min="1" max="365" required [(ngModel)]="createForm.duration_days">
+        </label>
+        <label>
+          <span class="label-title">
+            Twój login
+            <button type="button" class="help-icon" aria-label="Podpowiedź dla pola Twój login" title="...">?</button>
+          </span>
+          <input name="author_login" required maxlength="80" [(ngModel)]="createForm.author_login">
+        </label>
+      </div>
+      <button class="primary-button" type="submit" [disabled]="loading">Stwórz wydarzenie</button>
+    </form>
+
+    <form class="panel" (ngSubmit)="joinEvent()">
+      <h2>Dołącz po kodzie</h2>
+      <label>
+        Kod wydarzenia
+        <input name="code" required maxlength="12" class="code-input" [(ngModel)]="joinForm.code">
+      </label>
+      <label>
+        Login
+        <input name="login" required maxlength="80" [(ngModel)]="joinForm.login">
+      </label>
+      <button class="primary-button" type="submit" [disabled]="loading">Wejdź do wydarzenia</button>
+      <p class="helper-text">Jeśli login już istnieje, zobaczysz i zmienisz jego deklaracje bez hasła.</p>
+    </form>
+  </section>
+
+  <ng-container *ngIf="event as activeEvent">
+    <section class="event-header">
+      <div>
+        <p class="eyebrow">Kod: <strong>{{ activeEvent.code }}</strong></p>
+        <h2>{{ activeEvent.name }}</h2>
+        <p>{{ activeEvent.description || 'Brak opisu.' }}</p>
+      </div>
+      <div class="event-summary">
+        <dl>
+          <div>
+            <dt>Zakres</dt>
+            <dd>{{ formatDate(activeEvent.start_date) }} - {{ formatDate(activeEvent.end_date) }}</dd>
+          </div>
+          <div>
+            <dt>Długość</dt>
+            <dd>{{ activeEvent.duration_days }} dni</dd>
+          </div>
+          <div>
+            <dt>Twój login</dt>
+            <dd>{{ currentLogin }}</dd>
+          </div>
+        </dl>
+        <button type="button" class="ghost-button" (click)="logout()" [disabled]="loading">
+          Wyloguj i wróć
+        </button>
+      </div>
+    </section>
+
+    <section class="workspace-grid">
+      <div class="panel calendar-panel">
+        <div class="section-heading">
+          <div>
+            <h2>Twoje blokery</h2>
+            <p>Kliknij dzień, aby oznaczyć go jako zajęty albo usunąć oznaczenie.</p>
+          </div>
+        </div>
+
+        <div class="manual-add">
+          <input type="date" [(ngModel)]="newBlockerDate" name="newBlockerDate">
+          <button type="button" class="secondary-button" (click)="addBlockerFromInput()" [disabled]="loading">
+            Dodaj dzień
+          </button>
+        </div>
+
+        <div class="range-add">
+          <h3>Dodaj zakres blokerów</h3>
+          <div class="range-fields">
+            <label>
+              Od
+              <input type="date" [(ngModel)]="newBlockerRange.start_date" name="newBlockerRangeStart">
+            </label>
+            <label>
+              Do
+              <input type="date" [(ngModel)]="newBlockerRange.end_date" name="newBlockerRangeEnd">
+            </label>
+            <button type="button" class="secondary-button" (click)="addBlockerRangeFromInput()" [disabled]="loading">
+              Dodaj zakres
+            </button>
+          </div>
+        </div>
+
+        <div class="calendar-picker">
+          <section class="calendar-month" *ngFor="let month of calendarMonths">
+            <h3>{{ month.label }}</h3>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span *ngFor="let weekday of weekdayLabels">{{ weekday }}</span>
+            </div>
+            <div class="calendar-days">
+              <button
+                type="button"
+                *ngFor="let day of month.days"
+                class="calendar-day"
+                [class.is-empty]="!day.date"
+                [class.is-outside-range]="day.date && !day.isInRange"
+                [class.is-blocked]="isCalendarDayBlocked(day)"
+                [attr.aria-label]="calendarDayLabel(day)"
+                [attr.aria-pressed]="day.date && day.isInRange ? isCalendarDayBlocked(day) : null"
+                (click)="toggleCalendarDay(day)"
+                [disabled]="loading || !day.date || !day.isInRange"
+              >
+                <span>{{ day.label }}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <div class="blocker-list">
+          <h3>Lista twoich blokerów</h3>
+          <p *ngIf="myBlockers.length === 0" class="empty-state">Nie masz jeszcze zapisanych blokerów.</p>
+          <button
+            type="button"
+            *ngFor="let blocker of myBlockers"
+            class="blocker-pill"
+            (click)="deleteBlocker(blocker.id)"
+            [disabled]="loading"
+            title="Usuń bloker"
+          >
+            {{ formatDate(blocker.date) }} <span>Usuń</span>
+          </button>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <h2>Uczestnicy</h2>
+        <div class="participant-list">
+          <article class="participant-row" *ngFor="let participant of activeEvent.participants">
+            <strong>{{ participant.login }}</strong>
+            <span>{{ participant.blockers.length }} zajętych dni</span>
+          </article>
+        </div>
+
+        <button type="button" class="primary-button full-width" (click)="calculate()" [disabled]="loading">
+          Wylicz top 10 terminów
+        </button>
+
+        <section class="suggestions" *ngIf="suggestions">
+          <p class="warning" *ngIf="suggestions.shortened && suggestions.suggestions.length > 0">
+            Część propozycji jest krótsza niż planowano. Najkrótsze mają {{ suggestions.used_duration_days }} dni.
+          </p>
+          <p class="empty-state" *ngIf="suggestions.suggestions.length === 0">
+            Brak terminu dostępnego dla wszystkich.
+          </p>
+          <article
+            class="suggestion-row"
+            [class.is-shortened]="suggestion.shortened"
+            *ngFor="let suggestion of suggestions.suggestions; index as index"
+          >
+            <span>#{{ index + 1 }}</span>
+            <strong>{{ formatDate(suggestion.start_date) }} - {{ formatDate(suggestion.end_date) }}</strong>
+            <em>{{ suggestion.duration_days }} dni</em>
+          </article>
+        </section>
+      </aside>
+    </section>
+  </ng-container>
+</main>

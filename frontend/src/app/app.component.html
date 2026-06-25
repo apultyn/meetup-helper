@@ -79,7 +79,7 @@
     <div class="modal-panel">
       <h2 id="join-confirmation-title">Potwierdź wejście</h2>
       <p *ngIf="join.isExistingParticipant; else newParticipantMessage">
-        Logujesz się jako <strong class="modal-login">{{ join.login }}</strong>.
+        Logujesz się jako istniejący użytkownik <strong class="modal-login">{{ join.login }}</strong>.
       </p>
       <ng-template #newParticipantMessage>
         <p>

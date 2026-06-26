@@ -4,6 +4,12 @@ Aplikacja do szukania wspólnego terminu wydarzenia lub wyjazdu.
 
 ## Uruchomienie
 
+Przed startem utwórz lokalny plik `.env` na podstawie szablonu i uzupełnij dane bazy:
+
+```bash
+cp .env.example .env
+```
+
 ```bash
 docker compose up --build
 ```
@@ -34,7 +40,15 @@ Workflow GitHub Actions buduje i wysyła obrazy zdefiniowane w `docker-compose.y
 - `msj102/meetup-helper-backend`
 - `msj102/meetup-helper-frontend`
 
-W repozytorium GitHub trzeba ustawić sekrety:
+W repozytorium GitHub trzeba ustawić zmienne i sekrety używane przez workflow oraz `docker-compose.yml`.
+
+Variables (`Settings` -> `Secrets and variables` -> `Actions` -> `Variables`):
+
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+
+Secrets (`Settings` -> `Secrets and variables` -> `Actions` -> `Secrets`):
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
+- `POSTGRES_PASSWORD`

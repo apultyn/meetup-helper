@@ -26,3 +26,15 @@ Po starcie:
 - logowanie operacji użytkowników w bazie.
 
 Backend używa FastAPI i PostgreSQL uruchamianego w osobnym kontenerze. Frontend jest aplikacją Angular serwowaną przez nginx, który przekazuje żądania `/api` do backendu.
+
+## Publikacja obrazów
+
+Workflow GitHub Actions buduje i wysyła obrazy zdefiniowane w `docker-compose.yml` po każdym pushu do `main`:
+
+- `msj102/meetup-helper-backend`
+- `msj102/meetup-helper-frontend`
+
+W repozytorium GitHub trzeba ustawić sekrety:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`

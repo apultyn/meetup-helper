@@ -276,9 +276,25 @@
           </article>
         </div>
 
-        <button type="button" class="primary-button full-width" (click)="calculate()" [disabled]="loading">
-          Wylicz top 10 terminów
-        </button>
+        <div class="suggestion-controls">
+          <label class="suggestion-limit">
+            Liczba terminów
+            <input
+              type="number"
+              name="suggestionLimit"
+              min="1"
+              [max]="maxSuggestionLimit"
+              [(ngModel)]="suggestionLimit"
+              [disabled]="loading"
+            >
+          </label>
+          <button type="button" class="primary-button" (click)="calculate()" [disabled]="loading">
+            Wylicz {{ normalizedSuggestionLimit }} terminów
+          </button>
+          <button type="button" class="secondary-button" (click)="openHeatmap()" [disabled]="loading">
+            Heatmapa dat
+          </button>
+        </div>
 
         <section class="suggestions" *ngIf="suggestions">
           <p class="warning" *ngIf="suggestions.shortened && suggestions.suggestions.length > 0">
@@ -307,6 +323,75 @@
           </article>
         </section>
       </aside>
+    </section>
+
+    <section
+      class="modal-backdrop heatmap-backdrop"
+      *ngIf="isHeatmapOpen"
+      aria-labelledby="heatmap-title"
+      aria-modal="true"
+      role="dialog"
+    >
+      <div class="modal-panel heatmap-modal">
+        <div class="heatmap-header">
+          <div>
+            <p class="eyebrow">Dostępność</p>
+            <h2 id="heatmap-title">Heatmapa dat</h2>
+          </div>
+          <button type="button" class="ghost-button" (click)="closeHeatmap()">
+            Zamknij
+          </button>
+        </div>
+
+        <div class="heatmap-legend" aria-hidden="true">
+          <span>Mniej osób</span>
+          <div class="legend-scale">
+            <span class="heatmap-level-1"></span>
+            <span class="heatmap-level-2"></span>
+            <span class="heatmap-level-3"></span>
+            <span class="heatmap-level-4"></span>
+            <span class="heatmap-level-5"></span>
+          </div>
+          <span>Więcej osób</span>
+        </div>
+
+        <div class="calendar-picker heatmap-calendar">
+          <section class="calendar-month" *ngFor="let month of calendarMonths">
+            <h3>{{ month.label }}</h3>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span *ngFor="let weekday of weekdayLabels">{{ weekday }}</span>
+            </div>
+            <div class="calendar-days">
+              <div
+                *ngFor="let day of month.days"
+                class="calendar-day heatmap-day"
+                [class.is-empty]="!day.date"
+                [class.is-outside-range]="day.date && !day.isInRange"
+                [ngClass]="'heatmap-level-' + heatmapLevel(day)"
+                [attr.aria-label]="heatmapDayLabel(day)"
+                [attr.tabindex]="day.date && day.isInRange ? 0 : null"
+              >
+                <span>{{ day.label }}</span>
+                <ng-container *ngIf="day.date && day.isInRange">
+                  <small>{{ heatmapAvailability(day) }}/{{ participantCount }}</small>
+                  <div class="heatmap-tooltip" role="tooltip">
+                    <div class="heatmap-tooltip-group">
+                      <strong>Może</strong>
+                      <span *ngIf="heatmapAvailableParticipants(day).length === 0" class="tooltip-empty">Nikt</span>
+                      <span *ngFor="let login of heatmapAvailableParticipants(day)">{{ login }}</span>
+                    </div>
+                    <div class="heatmap-tooltip-group">
+                      <strong>Nie może</strong>
+                      <span *ngIf="heatmapUnavailableParticipants(day).length === 0" class="tooltip-empty">Nikt</span>
+                      <span *ngFor="let login of heatmapUnavailableParticipants(day)">{{ login }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
     </section>
   </ng-container>
 </main>

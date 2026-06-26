@@ -21,7 +21,7 @@ Po starcie:
 - dołączanie do wydarzenia po kodzie i loginie,
 - ponowne wejście tym samym loginem pozwala edytować swoje deklaracje,
 - dodawanie i usuwanie dni albo całych zakresów dni, w których użytkownik jest zajęty,
-- wyliczanie do 10 najbliższych terminów dostępnych dla wszystkich,
+- wyliczanie wybranej liczby najbliższych terminów dostępnych dla wszystkich (domyślnie 10, maksymalnie 1000),
 - szukanie wariantów kompromisowych: najpierw krótszy czas wydarzenia, potem pominięcie jednej, dwóch i kolejnych osób,
 - logowanie operacji użytkowników w bazie.
 

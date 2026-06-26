@@ -55,7 +55,11 @@ export class ApiService {
     );
   }
 
-  calculateSuggestions(code: string): Observable<SuggestionResponse> {
-    return this.http.get<SuggestionResponse>(`${this.baseUrl}/events/${encodeURIComponent(code)}/suggestions`);
+  calculateSuggestions(code: string, limit = 10): Observable<SuggestionResponse> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<SuggestionResponse>(
+      `${this.baseUrl}/events/${encodeURIComponent(code)}/suggestions`,
+      { params }
+    );
   }
 }

@@ -17,6 +17,11 @@ interface CalendarMonth {
   days: CalendarDay[];
 }
 
+interface HeatmapAvailabilityDetails {
+  available: string[];
+  unavailable: string[];
+}
+
 interface PendingJoin {
   code: string;
   login: string;
@@ -54,6 +59,11 @@ export class AppComponent implements OnDestroy {
   isEditingEvent = false;
   currentLogin = '';
   calendarMonths: CalendarMonth[] = [];
+  readonly maxSuggestionLimit = 1000;
+  suggestionLimit: number | null = 10;
+  isHeatmapOpen = false;
+  availabilityByDate: Record<string, number> = {};
+  availabilityDetailsByDate: Record<string, HeatmapAvailabilityDetails> = {};
   weekdayLabels = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
   newBlockerDate = '';
   newBlockerRange = {
@@ -84,6 +94,14 @@ export class AppComponent implements OnDestroy {
 
   get isEventCreator(): boolean {
     return this.event ? this.normalizeLogin(this.currentLogin) === this.normalizeLogin(this.event.created_by) : false;
+  }
+
+  get participantCount(): number {
+    return this.event?.participants.length ?? 0;
+  }
+
+  get normalizedSuggestionLimit(): number {
+    return this.normalizeSuggestionLimit(this.suggestionLimit);
   }
 
   get myBlockers(): Blocker[] {
@@ -191,6 +209,9 @@ export class AppComponent implements OnDestroy {
     this.event = null;
     this.currentLogin = '';
     this.calendarMonths = [];
+    this.availabilityByDate = {};
+    this.availabilityDetailsByDate = {};
+    this.isHeatmapOpen = false;
     this.closeJoinConfirmation();
     this.newBlockerDate = '';
     this.newBlockerRange = {
@@ -204,6 +225,7 @@ export class AppComponent implements OnDestroy {
     };
     this.isEditingEvent = false;
     this.suggestions = null;
+    this.suggestionLimit = 10;
     this.error = '';
     this.notice = 'Wylogowano z wydarzenia.';
     this.loading = false;
@@ -396,8 +418,11 @@ export class AppComponent implements OnDestroy {
       return;
     }
 
+    const limit = this.normalizeSuggestionLimit(this.suggestionLimit);
+    this.suggestionLimit = limit;
+
     this.runRequest(() => {
-      this.api.calculateSuggestions(this.event?.code ?? '').subscribe({
+      this.api.calculateSuggestions(this.event?.code ?? '', limit).subscribe({
         next: (suggestions) => {
           this.suggestions = suggestions;
           if (suggestions.suggestions.length === 0) {
@@ -412,6 +437,64 @@ export class AppComponent implements OnDestroy {
         error: (error: HttpErrorResponse) => this.handleError(error)
       });
     });
+  }
+
+  openHeatmap(): void {
+    if (!this.event) {
+      return;
+    }
+
+    this.isHeatmapOpen = true;
+    this.error = '';
+  }
+
+  closeHeatmap(): void {
+    this.isHeatmapOpen = false;
+  }
+
+  heatmapAvailability(day: CalendarDay): number {
+    if (!day.date || !day.isInRange) {
+      return 0;
+    }
+
+    return this.availabilityByDate[day.date] ?? 0;
+  }
+
+  heatmapAvailableParticipants(day: CalendarDay): string[] {
+    if (!day.date || !day.isInRange) {
+      return [];
+    }
+
+    return this.availabilityDetailsByDate[day.date]?.available ?? [];
+  }
+
+  heatmapUnavailableParticipants(day: CalendarDay): string[] {
+    if (!day.date || !day.isInRange) {
+      return [];
+    }
+
+    return this.availabilityDetailsByDate[day.date]?.unavailable ?? [];
+  }
+
+  heatmapLevel(day: CalendarDay): number {
+    if (!day.date || !day.isInRange || this.participantCount === 0) {
+      return 0;
+    }
+
+    const ratio = this.heatmapAvailability(day) / this.participantCount;
+    if (ratio <= 0) {
+      return 0;
+    }
+
+    return Math.max(1, Math.ceil(ratio * 5));
+  }
+
+  heatmapDayLabel(day: CalendarDay): string | null {
+    if (!day.date || !day.isInRange) {
+      return null;
+    }
+
+    return `${this.formatDate(day.date)}, pasuje ${this.heatmapAvailability(day)} z ${this.participantCount} osób`;
   }
 
   isMyBlocked(day: string): boolean {
@@ -466,6 +549,8 @@ export class AppComponent implements OnDestroy {
     this.event = event;
     this.currentLogin = login;
     this.calendarMonths = this.buildCalendarMonths(event.start_date, event.end_date);
+    this.availabilityDetailsByDate = this.buildAvailabilityDetailsByDate(event);
+    this.availabilityByDate = this.buildAvailabilityByDate(this.availabilityDetailsByDate);
     if (!this.isEditingEvent) {
       this.syncEventEditForm(event);
     }
@@ -540,6 +625,65 @@ export class AppComponent implements OnDestroy {
     }
 
     this.loading = false;
+  }
+
+  private normalizeSuggestionLimit(value: number | null): number {
+    if (value === null) {
+      return 10;
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 10;
+    }
+
+    return Math.min(this.maxSuggestionLimit, Math.max(1, Math.trunc(numericValue)));
+  }
+
+  private buildAvailabilityDetailsByDate(event: EventRead): Record<string, HeatmapAvailabilityDetails> {
+    const blockedDatesByParticipant = new Map<number, Set<string>>();
+
+    for (const participant of event.participants) {
+      blockedDatesByParticipant.set(
+        participant.id,
+        new Set(participant.blockers.map((blocker) => blocker.date))
+      );
+    }
+
+    const availabilityDetailsByDate: Record<string, HeatmapAvailabilityDetails> = {};
+    const cursor = this.parseIsoDate(event.start_date);
+    const end = this.parseIsoDate(event.end_date);
+
+    while (cursor <= end) {
+      const dateKey = this.toIsoDate(cursor);
+      const available: string[] = [];
+      const unavailable: string[] = [];
+
+      for (const participant of event.participants) {
+        if (blockedDatesByParticipant.get(participant.id)?.has(dateKey)) {
+          unavailable.push(participant.login);
+        } else {
+          available.push(participant.login);
+        }
+      }
+
+      availabilityDetailsByDate[dateKey] = { available, unavailable };
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return availabilityDetailsByDate;
+  }
+
+  private buildAvailabilityByDate(
+    availabilityDetailsByDate: Record<string, HeatmapAvailabilityDetails>
+  ): Record<string, number> {
+    const availabilityByDate: Record<string, number> = {};
+
+    for (const [dateKey, details] of Object.entries(availabilityDetailsByDate)) {
+      availabilityByDate[dateKey] = details.available.length;
+    }
+
+    return availabilityByDate;
   }
 
   private buildCalendarMonths(startValue: string, endValue: string): CalendarMonth[] {

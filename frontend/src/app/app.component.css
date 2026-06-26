@@ -383,6 +383,21 @@ textarea {
   margin-top: 18px;
 }
 
+.suggestion-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.suggestion-controls .primary-button,
+.suggestion-controls .secondary-button {
+  width: 100%;
+}
+
+.suggestion-limit {
+  margin-bottom: 0;
+}
+
 .warning {
   margin: 0;
   border-radius: 8px;

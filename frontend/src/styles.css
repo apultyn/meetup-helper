@@ -139,8 +139,167 @@ textarea:disabled {
   opacity: 0.75;
 }
 
+.heatmap-backdrop {
+  align-items: start;
+  overflow: auto;
+}
+
+.heatmap-modal {
+  width: min(100%, 980px);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.heatmap-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.heatmap-header h2 {
+  margin: 4px 0 0;
+  color: #10201d;
+}
+
+.heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #64706d;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.legend-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 4px;
+}
+
+.legend-scale span {
+  height: 12px;
+  border: 1px solid rgba(16, 32, 29, 0.12);
+  border-radius: 999px;
+}
+
+.heatmap-calendar {
+  margin-top: 0;
+}
+
+.heatmap-day {
+  position: relative;
+  gap: 2px;
+  padding: 4px;
+  overflow: visible;
+  cursor: default;
+  line-height: 1;
+}
+
+.heatmap-day small {
+  color: #34403d;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.heatmap-tooltip {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  width: min(280px, calc(100vw - 48px));
+  max-height: min(320px, calc(100vh - 24px));
+  gap: 10px;
+  overflow: auto;
+  border: 1px solid rgba(16, 32, 29, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  color: #10201d;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(16, 32, 29, 0.18);
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.heatmap-tooltip.is-above {
+  transform: translate(-50%, -100%);
+}
+
+.heatmap-tooltip-group {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.heatmap-tooltip-group strong {
+  color: #64706d;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.heatmap-tooltip-group span {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.heatmap-tooltip-group .tooltip-empty {
+  color: #97a29f;
+}
+
+.heatmap-level-0 {
+  border-color: #f3b1b1;
+  background: #fff1f1;
+  color: #8a1f1f;
+}
+
+.heatmap-level-1 {
+  border-color: #fed7aa;
+  background: #ffedd5;
+  color: #7c2d12;
+}
+
+.heatmap-level-2 {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #713f12;
+}
+
+.heatmap-level-3 {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.heatmap-level-4 {
+  border-color: #5eead4;
+  background: #99f6e4;
+  color: #134e4a;
+}
+
+.heatmap-level-5 {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.heatmap-level-5 small {
+  color: #dff5f1;
+}
+
 @media (max-width: 860px) {
   .event-summary {
     min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .heatmap-header {
+    display: grid;
+  }
+
+  .legend-scale {
+    grid-template-columns: repeat(5, 22px);
   }
 }

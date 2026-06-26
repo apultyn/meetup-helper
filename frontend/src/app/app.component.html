@@ -276,9 +276,25 @@
           </article>
         </div>
 
-        <button type="button" class="primary-button full-width" (click)="calculate()" [disabled]="loading">
-          Wylicz top 10 terminów
-        </button>
+        <div class="suggestion-controls">
+          <label class="suggestion-limit">
+            Liczba terminów
+            <input
+              type="number"
+              name="suggestionLimit"
+              min="1"
+              [max]="maxSuggestionLimit"
+              [(ngModel)]="suggestionLimit"
+              [disabled]="loading"
+            >
+          </label>
+          <button type="button" class="primary-button" (click)="calculate()" [disabled]="loading">
+            Wylicz {{ normalizedSuggestionLimit }} terminów
+          </button>
+          <button type="button" class="secondary-button" (click)="openHeatmap()" [disabled]="loading">
+            Heatmapa dat
+          </button>
+        </div>
 
         <section class="suggestions" *ngIf="suggestions">
           <p class="warning" *ngIf="suggestions.shortened && suggestions.suggestions.length > 0">
@@ -294,9 +310,9 @@
             class="suggestion-row"
             [class.is-shortened]="suggestion.shortened"
             [class.is-excluded]="suggestion.excluded_participants_count > 0"
-            *ngFor="let suggestion of suggestions.suggestions; index as index"
+            *ngFor="let suggestion of visibleSuggestions; index as index"
           >
-            <span class="suggestion-index">#{{ index + 1 }}</span>
+            <span class="suggestion-index">#{{ suggestionPageStartIndex + index + 1 }}</span>
             <div class="suggestion-main">
               <strong>{{ formatDate(suggestion.start_date) }} - {{ formatDate(suggestion.end_date) }}</strong>
               <small *ngIf="suggestion.excluded_participants.length > 0">
@@ -305,8 +321,115 @@
             </div>
             <em>{{ suggestion.duration_days }} dni</em>
           </article>
+          <div class="suggestion-pagination" *ngIf="shouldPaginateSuggestions">
+            <button
+              type="button"
+              class="ghost-button"
+              (click)="previousSuggestionPage()"
+              [disabled]="suggestionPage <= 1"
+            >
+              Poprzednie
+            </button>
+            <span>
+              {{ suggestionPageStartIndex + 1 }}-{{ suggestionPageEndIndex }} z {{ suggestions.suggestions.length }}
+            </span>
+            <button
+              type="button"
+              class="ghost-button"
+              (click)="nextSuggestionPage()"
+              [disabled]="suggestionPage >= totalSuggestionPages"
+            >
+              Następne
+            </button>
+          </div>
         </section>
       </aside>
+    </section>
+
+    <section
+      class="modal-backdrop heatmap-backdrop"
+      *ngIf="isHeatmapOpen"
+      aria-labelledby="heatmap-title"
+      aria-modal="true"
+      role="dialog"
+      (scroll)="hideHeatmapTooltip()"
+    >
+      <div class="modal-panel heatmap-modal" (scroll)="hideHeatmapTooltip()">
+        <div class="heatmap-header">
+          <div>
+            <p class="eyebrow">Dostępność</p>
+            <h2 id="heatmap-title">Heatmapa dat</h2>
+          </div>
+          <button type="button" class="ghost-button" (click)="closeHeatmap()">
+            Zamknij
+          </button>
+        </div>
+
+        <div class="heatmap-legend" aria-hidden="true">
+          <span>Mniej osób</span>
+          <div class="legend-scale">
+            <span class="heatmap-level-1"></span>
+            <span class="heatmap-level-2"></span>
+            <span class="heatmap-level-3"></span>
+            <span class="heatmap-level-4"></span>
+            <span class="heatmap-level-5"></span>
+          </div>
+          <span>Więcej osób</span>
+        </div>
+
+        <div class="calendar-picker heatmap-calendar">
+          <section class="calendar-month" *ngFor="let month of calendarMonths">
+            <h3>{{ month.label }}</h3>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span *ngFor="let weekday of weekdayLabels">{{ weekday }}</span>
+            </div>
+            <div class="calendar-days">
+              <div
+                *ngFor="let day of month.days"
+                class="calendar-day heatmap-day"
+                [class.is-empty]="!day.date"
+                [class.is-outside-range]="day.date && !day.isInRange"
+                [ngClass]="'heatmap-level-' + heatmapLevel(day)"
+                [attr.aria-label]="heatmapDayLabel(day)"
+                [attr.tabindex]="day.date && day.isInRange ? 0 : null"
+                (mouseenter)="showHeatmapTooltip(day, $event)"
+                (mouseleave)="scheduleHideHeatmapTooltip()"
+                (focus)="showHeatmapTooltip(day, $event)"
+                (blur)="hideHeatmapTooltip()"
+              >
+                <span>{{ day.label }}</span>
+                <ng-container *ngIf="day.date && day.isInRange">
+                  <small>{{ heatmapAvailability(day) }}/{{ participantCount }}</small>
+                </ng-container>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div
+          class="heatmap-tooltip"
+          *ngIf="activeHeatmapTooltip as tooltip"
+          [class.is-above]="tooltip.placement === 'above'"
+          [style.left.px]="tooltip.left"
+          [style.top.px]="tooltip.top"
+          (mouseenter)="keepHeatmapTooltipOpen()"
+          (mouseleave)="hideHeatmapTooltip()"
+          role="tooltip"
+        >
+          <ng-container *ngIf="activeHeatmapTooltipDetails as details">
+            <div class="heatmap-tooltip-group">
+              <strong>Może</strong>
+              <span *ngIf="details.available.length === 0" class="tooltip-empty">Nikt</span>
+              <span *ngFor="let login of details.available">{{ login }}</span>
+            </div>
+            <div class="heatmap-tooltip-group">
+              <strong>Nie może</strong>
+              <span *ngIf="details.unavailable.length === 0" class="tooltip-empty">Nikt</span>
+              <span *ngFor="let login of details.unavailable">{{ login }}</span>
+            </div>
+          </ng-container>
+        </div>
+      </div>
     </section>
   </ng-container>
 </main>

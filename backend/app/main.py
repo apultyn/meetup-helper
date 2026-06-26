@@ -428,7 +428,7 @@ def delete_blocker(
 @app.get("/api/events/{code}/suggestions", response_model=SuggestionResponse)
 def calculate_suggestions(
     code: str,
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=10, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
     event = get_event_or_404(db, code)

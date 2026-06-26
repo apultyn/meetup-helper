@@ -7,6 +7,13 @@ export interface EventCreate {
   author_login: string;
 }
 
+export interface EventUpdate {
+  login: string;
+  start_date: string;
+  end_date: string;
+  duration_days: number;
+}
+
 export interface ParticipantJoin {
   login: string;
 }
@@ -51,12 +58,15 @@ export interface Suggestion {
   duration_days: number;
   requested_duration_days: number;
   shortened: boolean;
+  excluded_participants: string[];
+  excluded_participants_count: number;
 }
 
 export interface SuggestionResponse {
   event_code: string;
   requested_duration_days: number;
   used_duration_days: number | null;
+  used_excluded_participants_count: number | null;
   shortened: boolean;
   suggestions: Suggestion[];
 }

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { ApiService } from './api.service';
-import { Blocker, BlockerRangeCreate, EventRead, Participant, SuggestionResponse } from './models';
+import { Blocker, BlockerRangeCreate, EventRead, EventUpdate, Participant, SuggestionResponse } from './models';
 
 interface CalendarDay {
   date: string | null;
@@ -46,6 +46,12 @@ export class AppComponent implements OnDestroy {
   };
 
   event: EventRead | null = null;
+  eventEditForm = {
+    start_date: '',
+    end_date: '',
+    duration_days: 1
+  };
+  isEditingEvent = false;
   currentLogin = '';
   calendarMonths: CalendarMonth[] = [];
   weekdayLabels = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
@@ -72,8 +78,12 @@ export class AppComponent implements OnDestroy {
     if (!this.event || !this.currentLogin) {
       return null;
     }
-    const loginKey = this.currentLogin.trim().toLocaleLowerCase('pl-PL');
-    return this.event.participants.find((participant) => participant.login.toLocaleLowerCase('pl-PL') === loginKey) ?? null;
+    const loginKey = this.normalizeLogin(this.currentLogin);
+    return this.event.participants.find((participant) => this.normalizeLogin(participant.login) === loginKey) ?? null;
+  }
+
+  get isEventCreator(): boolean {
+    return this.event ? this.normalizeLogin(this.currentLogin) === this.normalizeLogin(this.event.created_by) : false;
   }
 
   get myBlockers(): Blocker[] {
@@ -133,12 +143,12 @@ export class AppComponent implements OnDestroy {
     this.runRequest(() => {
       this.api.getEvent(code).subscribe({
         next: (event) => {
-          const loginKey = login.toLocaleLowerCase('pl-PL');
+          const loginKey = this.normalizeLogin(login);
           this.pendingJoin = {
             code,
             login,
             isExistingParticipant: event.participants.some(
-              (participant) => participant.login.toLocaleLowerCase('pl-PL') === loginKey
+              (participant) => this.normalizeLogin(participant.login) === loginKey
             )
           };
           this.startJoinCountdown();
@@ -187,6 +197,12 @@ export class AppComponent implements OnDestroy {
       start_date: '',
       end_date: ''
     };
+    this.eventEditForm = {
+      start_date: '',
+      end_date: '',
+      duration_days: 1
+    };
+    this.isEditingEvent = false;
     this.suggestions = null;
     this.error = '';
     this.notice = 'Wylogowano z wydarzenia.';
@@ -219,6 +235,101 @@ export class AppComponent implements OnDestroy {
       this.notice = '';
       this.error = 'Nie udało się skopiować kodu. Zaznacz kod ręcznie.';
     }
+  }
+
+  startEventEditing(): void {
+    if (!this.event || !this.isEventCreator) {
+      return;
+    }
+
+    this.syncEventEditForm(this.event);
+    this.isEditingEvent = true;
+    this.error = '';
+    this.notice = '';
+  }
+
+  cancelEventEditing(): void {
+    if (this.event) {
+      this.syncEventEditForm(this.event);
+    }
+    this.isEditingEvent = false;
+    this.error = '';
+  }
+
+  updateEventSettings(): void {
+    if (!this.event || !this.isEventCreator) {
+      return;
+    }
+
+    const durationDays = Number(this.eventEditForm.duration_days);
+    const payload: EventUpdate = {
+      login: this.currentLogin,
+      start_date: this.eventEditForm.start_date,
+      end_date: this.eventEditForm.end_date,
+      duration_days: durationDays
+    };
+
+    if (!payload.start_date || !payload.end_date) {
+      this.error = 'Wybierz początek i koniec zakresu wydarzenia.';
+      return;
+    }
+
+    if (!Number.isInteger(durationDays) || durationDays < 1) {
+      this.error = 'Długość wydarzenia musi być dodatnią liczbą dni.';
+      return;
+    }
+
+    if (this.parseIsoDate(payload.end_date) < this.parseIsoDate(payload.start_date)) {
+      this.error = 'Koniec zakresu nie może być wcześniejszy niż początek.';
+      return;
+    }
+
+    if (durationDays > this.countInclusiveDays(payload.start_date, payload.end_date)) {
+      this.error = 'Długość wydarzenia nie może przekraczać zakresu dat.';
+      return;
+    }
+
+    this.runRequest(() => {
+      this.api.updateEvent(this.event?.code ?? '', payload).subscribe({
+        next: (event) => {
+          this.isEditingEvent = false;
+          this.setActiveEvent(event, this.currentLogin);
+          this.notice = 'Zapisano ustawienia wydarzenia.';
+          this.loading = false;
+        },
+        error: (error: HttpErrorResponse) => this.handleError(error)
+      });
+    });
+  }
+
+  canRemoveParticipant(participant: Participant): boolean {
+    return (
+      this.isEventCreator &&
+      !!this.event &&
+      this.normalizeLogin(participant.login) !== this.normalizeLogin(this.event.created_by)
+    );
+  }
+
+  deleteParticipant(participant: Participant): void {
+    if (!this.event || !this.canRemoveParticipant(participant)) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Usunąć ${participant.login} z wydarzenia? Usunięte zostaną też jego blokery.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.runRequest(() => {
+      this.api.deleteParticipant(this.event?.code ?? '', participant.id, this.currentLogin).subscribe({
+        next: (event) => {
+          this.setActiveEvent(event, this.currentLogin);
+          this.notice = `Usunięto uczestnika ${participant.login}.`;
+          this.loading = false;
+        },
+        error: (error: HttpErrorResponse) => this.handleError(error)
+      });
+    });
   }
 
   addBlockerFromInput(): void {
@@ -289,9 +400,13 @@ export class AppComponent implements OnDestroy {
       this.api.calculateSuggestions(this.event?.code ?? '').subscribe({
         next: (suggestions) => {
           this.suggestions = suggestions;
-          this.notice = suggestions.suggestions.length > 0
-            ? 'Wyliczono dostępne terminy.'
-            : 'Brak dostępnych terminów nawet po skróceniu wydarzenia.';
+          if (suggestions.suggestions.length === 0) {
+            this.notice = 'Brak dostępnych terminów nawet po skróceniu wydarzenia i sprawdzeniu wariantów z pominięciem osób.';
+          } else if ((suggestions.used_excluded_participants_count ?? 0) > 0) {
+            this.notice = 'Wyliczono terminy z pominięciem części osób.';
+          } else {
+            this.notice = 'Wyliczono dostępne terminy.';
+          }
           this.loading = false;
         },
         error: (error: HttpErrorResponse) => this.handleError(error)
@@ -311,6 +426,18 @@ export class AppComponent implements OnDestroy {
       month: '2-digit',
       year: 'numeric'
     }).format(date);
+  }
+
+  formatExcludedCount(count: number | null): string {
+    if (count === 1) {
+      return '1 osoby';
+    }
+
+    return `${count ?? 0} osób`;
+  }
+
+  formatExcludedParticipants(participants: string[]): string {
+    return participants.join(', ');
   }
 
   private addBlockers(dates: string[], ranges: BlockerRangeCreate[] = []): void {
@@ -339,8 +466,32 @@ export class AppComponent implements OnDestroy {
     this.event = event;
     this.currentLogin = login;
     this.calendarMonths = this.buildCalendarMonths(event.start_date, event.end_date);
+    if (!this.isEditingEvent) {
+      this.syncEventEditForm(event);
+    }
     this.suggestions = null;
     this.error = '';
+  }
+
+  private syncEventEditForm(event: EventRead): void {
+    this.eventEditForm = {
+      start_date: event.start_date,
+      end_date: event.end_date,
+      duration_days: event.duration_days
+    };
+  }
+
+  private normalizeLogin(login: string): string {
+    return login.trim().toLocaleLowerCase('pl-PL');
+  }
+
+  private countInclusiveDays(startValue: string, endValue: string): number {
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+    const [startYear, startMonth, startDay] = startValue.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endValue.split('-').map(Number);
+    const start = Date.UTC(startYear, startMonth - 1, startDay);
+    const end = Date.UTC(endYear, endMonth - 1, endDay);
+    return Math.floor((end - start) / millisecondsPerDay) + 1;
   }
 
   private runRequest(start: () => void): void {

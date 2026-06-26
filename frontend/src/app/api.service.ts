@@ -6,6 +6,7 @@ import {
   BlockerCreate,
   EventCreate,
   EventRead,
+  EventUpdate,
   ParticipantJoin,
   SuggestionResponse
 } from './models';
@@ -26,8 +27,20 @@ export class ApiService {
     return this.http.get<EventRead>(`${this.baseUrl}/events/${encodeURIComponent(code)}`);
   }
 
+  updateEvent(code: string, payload: EventUpdate): Observable<EventRead> {
+    return this.http.patch<EventRead>(`${this.baseUrl}/events/${encodeURIComponent(code)}`, payload);
+  }
+
   joinEvent(code: string, payload: ParticipantJoin): Observable<EventRead> {
     return this.http.post<EventRead>(`${this.baseUrl}/events/${encodeURIComponent(code)}/participants`, payload);
+  }
+
+  deleteParticipant(code: string, participantId: number, login: string): Observable<EventRead> {
+    const params = new HttpParams().set('login', login);
+    return this.http.delete<EventRead>(
+      `${this.baseUrl}/events/${encodeURIComponent(code)}/participants/${participantId}`,
+      { params }
+    );
   }
 
   addBlockers(code: string, payload: BlockerCreate): Observable<EventRead> {
@@ -46,4 +59,3 @@ export class ApiService {
     return this.http.get<SuggestionResponse>(`${this.baseUrl}/events/${encodeURIComponent(code)}/suggestions`);
   }
 }
-

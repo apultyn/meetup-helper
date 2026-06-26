@@ -133,9 +133,51 @@
             <dd>{{ currentLogin }}</dd>
           </div>
         </dl>
-        <button type="button" class="ghost-button" (click)="logout()" [disabled]="loading">
-          Wyloguj i wróć
-        </button>
+        <form class="event-edit-form" *ngIf="isEventCreator && isEditingEvent" (ngSubmit)="updateEventSettings()">
+          <div class="range-fields event-edit-fields">
+            <label>
+              Od
+              <input type="date" name="eventEditStart" required [(ngModel)]="eventEditForm.start_date">
+            </label>
+            <label>
+              Do
+              <input type="date" name="eventEditEnd" required [(ngModel)]="eventEditForm.end_date">
+            </label>
+            <label>
+              Długość
+              <input
+                type="number"
+                name="eventEditDuration"
+                min="1"
+                max="365"
+                required
+                [(ngModel)]="eventEditForm.duration_days"
+              >
+            </label>
+          </div>
+          <div class="event-edit-actions">
+            <button type="button" class="ghost-button" (click)="cancelEventEditing()" [disabled]="loading">
+              Anuluj
+            </button>
+            <button type="submit" class="primary-button" [disabled]="loading">
+              Zapisz
+            </button>
+          </div>
+        </form>
+        <div class="event-summary-actions">
+          <button
+            type="button"
+            class="secondary-button"
+            *ngIf="isEventCreator && !isEditingEvent"
+            (click)="startEventEditing()"
+            [disabled]="loading"
+          >
+            Edytuj termin
+          </button>
+          <button type="button" class="ghost-button" (click)="logout()" [disabled]="loading">
+            Wyloguj i wróć
+          </button>
+        </div>
       </div>
     </section>
 
@@ -217,8 +259,20 @@
         <h2>Uczestnicy</h2>
         <div class="participant-list">
           <article class="participant-row" *ngFor="let participant of activeEvent.participants">
-            <strong>{{ participant.login }}</strong>
-            <span>{{ participant.blockers.length }} zajętych dni</span>
+            <div class="participant-info">
+              <strong>{{ participant.login }}</strong>
+              <span>{{ participant.blockers.length }} zajętych dni</span>
+            </div>
+            <button
+              type="button"
+              class="danger-button participant-remove-button"
+              *ngIf="canRemoveParticipant(participant)"
+              (click)="deleteParticipant(participant)"
+              [disabled]="loading"
+              title="Usuń uczestnika"
+            >
+              Usuń
+            </button>
           </article>
         </div>
 
@@ -230,16 +284,25 @@
           <p class="warning" *ngIf="suggestions.shortened && suggestions.suggestions.length > 0">
             Część propozycji jest krótsza niż planowano. Najkrótsze mają {{ suggestions.used_duration_days }} dni.
           </p>
+          <p class="warning" *ngIf="(suggestions.used_excluded_participants_count ?? 0) > 0 && suggestions.suggestions.length > 0">
+            Brak terminu dla pełnego składu. Poniższe propozycje wymagają pominięcia {{ formatExcludedCount(suggestions.used_excluded_participants_count) }}.
+          </p>
           <p class="empty-state" *ngIf="suggestions.suggestions.length === 0">
-            Brak terminu dostępnego dla wszystkich.
+            Brak terminu dostępnego nawet po skróceniu wydarzenia i sprawdzeniu wariantów z pominięciem osób.
           </p>
           <article
             class="suggestion-row"
             [class.is-shortened]="suggestion.shortened"
+            [class.is-excluded]="suggestion.excluded_participants_count > 0"
             *ngFor="let suggestion of suggestions.suggestions; index as index"
           >
-            <span>#{{ index + 1 }}</span>
-            <strong>{{ formatDate(suggestion.start_date) }} - {{ formatDate(suggestion.end_date) }}</strong>
+            <span class="suggestion-index">#{{ index + 1 }}</span>
+            <div class="suggestion-main">
+              <strong>{{ formatDate(suggestion.start_date) }} - {{ formatDate(suggestion.end_date) }}</strong>
+              <small *ngIf="suggestion.excluded_participants.length > 0">
+                Bez: {{ formatExcludedParticipants(suggestion.excluded_participants) }}
+              </small>
+            </div>
             <em>{{ suggestion.duration_days }} dni</em>
           </article>
         </section>

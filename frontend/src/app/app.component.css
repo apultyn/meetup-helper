@@ -148,7 +148,8 @@ textarea {
 
 .primary-button,
 .secondary-button,
-.ghost-button {
+.ghost-button,
+.danger-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -172,6 +173,11 @@ textarea {
   color: #10201d;
   background: #ffffff;
   border: 1px solid #d9e2df;
+}
+
+.danger-button {
+  color: #8a1f1f;
+  background: #ffe9e9;
 }
 
 .full-width {
@@ -202,6 +208,32 @@ textarea {
   margin: 2px 0 0;
   color: #10201d;
   font-weight: 800;
+}
+
+.event-summary-actions,
+.event-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.event-summary-actions {
+  align-items: center;
+}
+
+.event-edit-actions {
+  justify-content: flex-end;
+}
+
+.event-edit-form {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #e2e9e7;
+  padding-top: 14px;
+}
+
+.event-edit-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .section-heading {
@@ -241,6 +273,10 @@ textarea {
   margin-bottom: 0;
 }
 
+.range-fields.event-edit-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .blocker-list {
   margin-top: 22px;
 }
@@ -272,15 +308,37 @@ textarea {
   gap: 10px;
 }
 
+.participant-info {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.participant-info strong,
+.participant-info span {
+  overflow-wrap: anywhere;
+}
+
 .participant-row,
 .suggestion-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   border: 1px solid #e2e9e7;
   border-radius: 8px;
   padding: 12px;
+}
+
+.participant-remove-button {
+  min-height: 34px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.suggestion-row.is-excluded {
+  border-color: #f0a36d;
+  background: #fff7ed;
 }
 
 .suggestion-row.is-shortened {
@@ -298,6 +356,25 @@ textarea {
 .suggestion-row em {
   color: #64706d;
   font-style: normal;
+}
+
+.suggestion-index,
+.suggestion-row em {
+  flex: 0 0 auto;
+}
+
+.suggestion-main {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.suggestion-main small {
+  color: #64706d;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .suggestions {
@@ -365,6 +442,7 @@ textarea {
   .workspace-grid,
   .form-row,
   .manual-add,
+  .event-edit-fields,
   .range-fields {
     grid-template-columns: 1fr;
   }
@@ -376,7 +454,9 @@ textarea {
 }
 
 @media (max-width: 520px) {
-  .modal-actions {
+  .modal-actions,
+  .event-summary-actions,
+  .event-edit-actions {
     display: grid;
   }
 }

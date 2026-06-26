@@ -2,6 +2,7 @@ import json
 import secrets
 import string
 from datetime import date, timedelta
+from itertools import combinations
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from .schemas import (
     BlockerRead,
     EventCreate,
     EventRead,
+    EventUpdate,
     OperationLogRead,
     ParticipantJoin,
     ParticipantRead,
@@ -73,6 +75,11 @@ def get_participant(db: Session, event: Event, login: str) -> Participant | None
         .filter(Participant.event_id == event.id, Participant.login_key == login_key(login))
         .first()
     )
+
+
+def ensure_event_creator(event: Event, login: str) -> None:
+    if login_key(event.created_by) != login_key(login):
+        raise HTTPException(status_code=403, detail="Tylko twórca wydarzenia może wykonać tę operację.")
 
 
 def get_or_create_participant(db: Session, event: Event, login: str) -> tuple[Participant, bool]:
@@ -139,49 +146,69 @@ def event_to_schema(event: Event) -> EventRead:
 
 
 def find_available_windows(event: Event, limit: int) -> SuggestionResponse:
-    blocked_dates = {blocker.date for blocker in event.blockers}
+    participants = sorted(event.participants, key=lambda participant: participant.login.casefold())
+    blockers_by_participant = {
+        participant.id: {blocker.date for blocker in participant.blockers}
+        for participant in participants
+    }
     requested_duration = event.duration_days
     total_days = (event.end_date - event.start_date).days + 1
-    suggestions: list[SuggestionRead] = []
+    max_excluded_participants = max(len(participants) - 1, 0)
 
-    for duration in range(requested_duration, 0, -1):
-        for offset in range(0, total_days - duration + 1):
-            start = event.start_date + timedelta(days=offset)
-            window_dates = {start + timedelta(days=day) for day in range(duration)}
+    for excluded_count in range(0, max_excluded_participants + 1):
+        for duration in range(requested_duration, 0, -1):
+            stage_suggestions: list[SuggestionRead] = []
 
-            if window_dates.isdisjoint(blocked_dates):
-                suggestions.append(
-                    SuggestionRead(
-                        start_date=start,
-                        end_date=start + timedelta(days=duration - 1),
-                        duration_days=duration,
-                        requested_duration_days=requested_duration,
-                        shortened=duration < requested_duration,
-                    )
-                )
+            for excluded_participants in combinations(participants, excluded_count):
+                excluded_ids = {participant.id for participant in excluded_participants}
+                excluded_logins = [participant.login for participant in excluded_participants]
+                blocked_dates: set[date] = set()
 
-            if len(suggestions) >= limit:
+                for participant in participants:
+                    if participant.id not in excluded_ids:
+                        blocked_dates.update(blockers_by_participant[participant.id])
+
+                for offset in range(0, total_days - duration + 1):
+                    start = event.start_date + timedelta(days=offset)
+                    window_dates = {start + timedelta(days=day) for day in range(duration)}
+
+                    if window_dates.isdisjoint(blocked_dates):
+                        stage_suggestions.append(
+                            SuggestionRead(
+                                start_date=start,
+                                end_date=start + timedelta(days=duration - 1),
+                                duration_days=duration,
+                                requested_duration_days=requested_duration,
+                                shortened=duration < requested_duration,
+                                excluded_participants=excluded_logins,
+                                excluded_participants_count=excluded_count,
+                            )
+                        )
+
+            if stage_suggestions:
+                suggestions = sorted(
+                    stage_suggestions,
+                    key=lambda suggestion: (
+                        suggestion.start_date,
+                        suggestion.end_date,
+                        suggestion.excluded_participants,
+                    ),
+                )[:limit]
+
                 return SuggestionResponse(
                     event_code=event.code,
                     requested_duration_days=requested_duration,
-                    used_duration_days=min(suggestion.duration_days for suggestion in suggestions),
-                    shortened=any(suggestion.shortened for suggestion in suggestions),
+                    used_duration_days=duration,
+                    used_excluded_participants_count=excluded_count,
+                    shortened=duration < requested_duration,
                     suggestions=suggestions,
                 )
-
-    if suggestions:
-        return SuggestionResponse(
-            event_code=event.code,
-            requested_duration_days=requested_duration,
-            used_duration_days=min(suggestion.duration_days for suggestion in suggestions),
-            shortened=any(suggestion.shortened for suggestion in suggestions),
-            suggestions=suggestions,
-        )
 
     return SuggestionResponse(
         event_code=event.code,
         requested_duration_days=requested_duration,
         used_duration_days=None,
+        used_excluded_participants_count=None,
         shortened=False,
         suggestions=[],
     )
@@ -231,6 +258,47 @@ def read_event(code: str, db: Session = Depends(get_db)):
     return event_to_schema(get_event_or_404(db, code))
 
 
+@app.patch("/api/events/{code}", response_model=EventRead)
+def update_event(code: str, payload: EventUpdate, db: Session = Depends(get_db)):
+    event = get_event_or_404(db, code)
+    ensure_event_creator(event, payload.login)
+
+    previous_settings = {
+        "start_date": event.start_date.isoformat(),
+        "end_date": event.end_date.isoformat(),
+        "duration_days": event.duration_days,
+    }
+    removed_blockers: list[str] = []
+
+    for blocker in list(event.blockers):
+        if blocker.date < payload.start_date or blocker.date > payload.end_date:
+            removed_blockers.append(blocker.date.isoformat())
+            db.delete(blocker)
+
+    event.start_date = payload.start_date
+    event.end_date = payload.end_date
+    event.duration_days = payload.duration_days
+
+    log_operation(
+        db,
+        event.id,
+        payload.login,
+        "event.updated",
+        {
+            "previous": previous_settings,
+            "current": {
+                "start_date": event.start_date.isoformat(),
+                "end_date": event.end_date.isoformat(),
+                "duration_days": event.duration_days,
+            },
+            "removed_blockers": removed_blockers,
+        },
+    )
+    db.commit()
+    db.refresh(event)
+    return event_to_schema(event)
+
+
 @app.post("/api/events/{code}/participants", response_model=EventRead)
 def join_event(code: str, payload: ParticipantJoin, db: Session = Depends(get_db)):
     event = get_event_or_404(db, code)
@@ -242,6 +310,41 @@ def join_event(code: str, payload: ParticipantJoin, db: Session = Depends(get_db
         payload.login,
         "participant.created" if created else "participant.rejoined",
         {"login": payload.login},
+    )
+    db.commit()
+    db.refresh(event)
+    return event_to_schema(event)
+
+
+@app.delete("/api/events/{code}/participants/{participant_id}", response_model=EventRead)
+def delete_participant(
+    code: str,
+    participant_id: int,
+    login: str = Query(min_length=1, max_length=80),
+    db: Session = Depends(get_db),
+):
+    event = get_event_or_404(db, code)
+    ensure_event_creator(event, login)
+
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.event_id == event.id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono uczestnika.")
+    if login_key(participant.login) == login_key(event.created_by):
+        raise HTTPException(status_code=403, detail="Nie można usunąć twórcy wydarzenia.")
+
+    removed_login = participant.login
+    removed_blockers_count = len(participant.blockers)
+    db.delete(participant)
+    log_operation(
+        db,
+        event.id,
+        login,
+        "participant.deleted",
+        {"login": removed_login, "removed_blockers_count": removed_blockers_count},
     )
     db.commit()
     db.refresh(event)
@@ -338,6 +441,7 @@ def calculate_suggestions(
         {
             "requested_duration_days": event.duration_days,
             "used_duration_days": response.used_duration_days,
+            "used_excluded_participants_count": response.used_excluded_participants_count,
             "suggestions_count": len(response.suggestions),
         },
     )

@@ -30,6 +30,32 @@
   color: #4b5563;
 }
 
+.event-code {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.event-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.event-code-row strong {
+  color: #10201d;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.copy-code-button {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 7px 12px;
+}
+
 .eyebrow {
   margin: 0;
   color: #0f766e;

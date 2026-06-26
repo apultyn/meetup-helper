@@ -210,6 +210,17 @@ export class AppComponent implements OnDestroy {
     });
   }
 
+  async copyEventCode(code: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(code);
+      this.error = '';
+      this.notice = 'Skopiowano kod wydarzenia.';
+    } catch {
+      this.notice = '';
+      this.error = 'Nie udało się skopiować kodu. Zaznacz kod ręcznie.';
+    }
+  }
+
   addBlockerFromInput(): void {
     if (!this.newBlockerDate) {
       this.error = 'Wybierz datę blokera.';

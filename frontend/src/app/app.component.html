@@ -100,7 +100,21 @@
   <ng-container *ngIf="event as activeEvent">
     <section class="event-header">
       <div>
-        <p class="eyebrow">Kod: <strong>{{ activeEvent.code }}</strong></p>
+        <div class="event-code">
+          <p class="eyebrow">Kod wydarzenia</p>
+          <div class="event-code-row">
+            <strong>{{ activeEvent.code }}</strong>
+            <button
+              type="button"
+              class="secondary-button copy-code-button"
+              (click)="copyEventCode(activeEvent.code)"
+              title="Skopiuj kod wydarzenia"
+              aria-label="Skopiuj kod wydarzenia"
+            >
+              Kopiuj
+            </button>
+          </div>
+        </div>
         <h2>{{ activeEvent.name }}</h2>
         <p>{{ activeEvent.description || 'Brak opisu.' }}</p>
       </div>

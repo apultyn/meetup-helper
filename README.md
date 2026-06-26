@@ -25,4 +25,4 @@ Po starcie:
 - uzupełnianie listy krótszymi propozycjami, gdy pełna długość nie daje 10 opcji,
 - logowanie operacji użytkowników w bazie.
 
-Backend używa FastAPI i SQLite. Frontend jest aplikacją Angular serwowaną przez nginx, który przekazuje żądania `/api` do backendu.
+Backend używa FastAPI i PostgreSQL uruchamianego w osobnym kontenerze. Frontend jest aplikacją Angular serwowaną przez nginx, który przekazuje żądania `/api` do backendu.

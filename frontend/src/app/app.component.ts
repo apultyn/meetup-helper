@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { ApiService } from './api.service';
-import { Blocker, BlockerRangeCreate, EventRead, EventUpdate, Participant, SuggestionResponse } from './models';
+import { Blocker, BlockerRangeCreate, EventRead, EventUpdate, Participant, Suggestion, SuggestionResponse } from './models';
 
 interface CalendarDay {
   date: string | null;
@@ -20,6 +20,13 @@ interface CalendarMonth {
 interface HeatmapAvailabilityDetails {
   available: string[];
   unavailable: string[];
+}
+
+interface HeatmapTooltipState {
+  date: string;
+  left: number;
+  top: number;
+  placement: 'above' | 'below';
 }
 
 interface PendingJoin {
@@ -60,8 +67,11 @@ export class AppComponent implements OnDestroy {
   currentLogin = '';
   calendarMonths: CalendarMonth[] = [];
   readonly maxSuggestionLimit = 1000;
+  readonly suggestionPageSize = 10;
   suggestionLimit: number | null = 10;
+  suggestionPage = 1;
   isHeatmapOpen = false;
+  activeHeatmapTooltip: HeatmapTooltipState | null = null;
   availabilityByDate: Record<string, number> = {};
   availabilityDetailsByDate: Record<string, HeatmapAvailabilityDetails> = {};
   weekdayLabels = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
@@ -77,11 +87,13 @@ export class AppComponent implements OnDestroy {
   pendingJoin: PendingJoin | null = null;
   joinConfirmationSeconds = 0;
   private joinConfirmationTimerId: number | null = null;
+  private heatmapTooltipHideTimerId: number | null = null;
 
   constructor(private readonly api: ApiService) {}
 
   ngOnDestroy(): void {
     this.clearJoinCountdown();
+    this.clearHeatmapTooltipHideTimer();
   }
 
   get currentParticipant(): Participant | null {
@@ -102,6 +114,41 @@ export class AppComponent implements OnDestroy {
 
   get normalizedSuggestionLimit(): number {
     return this.normalizeSuggestionLimit(this.suggestionLimit);
+  }
+
+  get visibleSuggestions(): Suggestion[] {
+    if (!this.suggestions) {
+      return [];
+    }
+
+    const startIndex = this.suggestionPageStartIndex;
+    return this.suggestions.suggestions.slice(startIndex, startIndex + this.suggestionPageSize);
+  }
+
+  get suggestionPageStartIndex(): number {
+    return (this.suggestionPage - 1) * this.suggestionPageSize;
+  }
+
+  get suggestionPageEndIndex(): number {
+    const suggestionsCount = this.suggestions?.suggestions.length ?? 0;
+    return Math.min(this.suggestionPage * this.suggestionPageSize, suggestionsCount);
+  }
+
+  get totalSuggestionPages(): number {
+    const suggestionsCount = this.suggestions?.suggestions.length ?? 0;
+    return Math.max(1, Math.ceil(suggestionsCount / this.suggestionPageSize));
+  }
+
+  get shouldPaginateSuggestions(): boolean {
+    return (this.suggestions?.suggestions.length ?? 0) > this.suggestionPageSize;
+  }
+
+  get activeHeatmapTooltipDetails(): HeatmapAvailabilityDetails | null {
+    if (!this.activeHeatmapTooltip) {
+      return null;
+    }
+
+    return this.availabilityDetailsByDate[this.activeHeatmapTooltip.date] ?? null;
   }
 
   get myBlockers(): Blocker[] {
@@ -212,6 +259,7 @@ export class AppComponent implements OnDestroy {
     this.availabilityByDate = {};
     this.availabilityDetailsByDate = {};
     this.isHeatmapOpen = false;
+    this.hideHeatmapTooltip();
     this.closeJoinConfirmation();
     this.newBlockerDate = '';
     this.newBlockerRange = {
@@ -226,6 +274,7 @@ export class AppComponent implements OnDestroy {
     this.isEditingEvent = false;
     this.suggestions = null;
     this.suggestionLimit = 10;
+    this.suggestionPage = 1;
     this.error = '';
     this.notice = 'Wylogowano z wydarzenia.';
     this.loading = false;
@@ -425,6 +474,7 @@ export class AppComponent implements OnDestroy {
       this.api.calculateSuggestions(this.event?.code ?? '', limit).subscribe({
         next: (suggestions) => {
           this.suggestions = suggestions;
+          this.suggestionPage = 1;
           if (suggestions.suggestions.length === 0) {
             this.notice = 'Brak dostępnych terminów nawet po skróceniu wydarzenia i sprawdzeniu wariantów z pominięciem osób.';
           } else if ((suggestions.used_excluded_participants_count ?? 0) > 0) {
@@ -439,6 +489,14 @@ export class AppComponent implements OnDestroy {
     });
   }
 
+  previousSuggestionPage(): void {
+    this.setSuggestionPage(this.suggestionPage - 1);
+  }
+
+  nextSuggestionPage(): void {
+    this.setSuggestionPage(this.suggestionPage + 1);
+  }
+
   openHeatmap(): void {
     if (!this.event) {
       return;
@@ -450,6 +508,53 @@ export class AppComponent implements OnDestroy {
 
   closeHeatmap(): void {
     this.isHeatmapOpen = false;
+    this.hideHeatmapTooltip();
+  }
+
+  showHeatmapTooltip(day: CalendarDay, event: MouseEvent | FocusEvent): void {
+    if (!day.date || !day.isInRange) {
+      return;
+    }
+
+    this.clearHeatmapTooltipHideTimer();
+
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const tooltipWidth = Math.min(280, Math.max(window.innerWidth - 32, 160));
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2, tooltipWidth / 2 + 12),
+      window.innerWidth - tooltipWidth / 2 - 12
+    );
+    const estimatedTooltipHeight = 260;
+    const hasRoomBelow = window.innerHeight - rect.bottom >= estimatedTooltipHeight;
+
+    this.activeHeatmapTooltip = {
+      date: day.date,
+      left,
+      top: hasRoomBelow ? rect.bottom + 8 : Math.max(12, rect.top - 8),
+      placement: hasRoomBelow ? 'below' : 'above'
+    };
+  }
+
+  keepHeatmapTooltipOpen(): void {
+    this.clearHeatmapTooltipHideTimer();
+  }
+
+  scheduleHideHeatmapTooltip(): void {
+    this.clearHeatmapTooltipHideTimer();
+    this.heatmapTooltipHideTimerId = window.setTimeout(() => {
+      this.activeHeatmapTooltip = null;
+      this.heatmapTooltipHideTimerId = null;
+    }, 120);
+  }
+
+  hideHeatmapTooltip(): void {
+    this.clearHeatmapTooltipHideTimer();
+    this.activeHeatmapTooltip = null;
   }
 
   heatmapAvailability(day: CalendarDay): number {
@@ -555,6 +660,8 @@ export class AppComponent implements OnDestroy {
       this.syncEventEditForm(event);
     }
     this.suggestions = null;
+    this.suggestionPage = 1;
+    this.hideHeatmapTooltip();
     this.error = '';
   }
 
@@ -625,6 +732,17 @@ export class AppComponent implements OnDestroy {
     }
 
     this.loading = false;
+  }
+
+  private setSuggestionPage(page: number): void {
+    this.suggestionPage = Math.min(Math.max(page, 1), this.totalSuggestionPages);
+  }
+
+  private clearHeatmapTooltipHideTimer(): void {
+    if (this.heatmapTooltipHideTimerId !== null) {
+      window.clearTimeout(this.heatmapTooltipHideTimerId);
+      this.heatmapTooltipHideTimerId = null;
+    }
   }
 
   private normalizeSuggestionLimit(value: number | null): number {

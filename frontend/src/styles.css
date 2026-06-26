@@ -206,13 +206,11 @@ textarea:disabled {
 }
 
 .heatmap-tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
+  position: fixed;
   z-index: 20;
   display: grid;
   width: min(280px, calc(100vw - 48px));
-  max-height: 240px;
+  max-height: min(320px, calc(100vh - 24px));
   gap: 10px;
   overflow: auto;
   border: 1px solid rgba(16, 32, 29, 0.12);
@@ -221,17 +219,12 @@ textarea:disabled {
   color: #10201d;
   background: #ffffff;
   box-shadow: 0 18px 45px rgba(16, 32, 29, 0.18);
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -4px);
-  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: auto;
+  transform: translateX(-50%);
 }
 
-.heatmap-day:hover .heatmap-tooltip,
-.heatmap-day:focus .heatmap-tooltip,
-.heatmap-day:focus-within .heatmap-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
+.heatmap-tooltip.is-above {
+  transform: translate(-50%, -100%);
 }
 
 .heatmap-tooltip-group {

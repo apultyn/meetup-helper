@@ -310,9 +310,9 @@
             class="suggestion-row"
             [class.is-shortened]="suggestion.shortened"
             [class.is-excluded]="suggestion.excluded_participants_count > 0"
-            *ngFor="let suggestion of suggestions.suggestions; index as index"
+            *ngFor="let suggestion of visibleSuggestions; index as index"
           >
-            <span class="suggestion-index">#{{ index + 1 }}</span>
+            <span class="suggestion-index">#{{ suggestionPageStartIndex + index + 1 }}</span>
             <div class="suggestion-main">
               <strong>{{ formatDate(suggestion.start_date) }} - {{ formatDate(suggestion.end_date) }}</strong>
               <small *ngIf="suggestion.excluded_participants.length > 0">
@@ -321,6 +321,27 @@
             </div>
             <em>{{ suggestion.duration_days }} dni</em>
           </article>
+          <div class="suggestion-pagination" *ngIf="shouldPaginateSuggestions">
+            <button
+              type="button"
+              class="ghost-button"
+              (click)="previousSuggestionPage()"
+              [disabled]="suggestionPage <= 1"
+            >
+              Poprzednie
+            </button>
+            <span>
+              {{ suggestionPageStartIndex + 1 }}-{{ suggestionPageEndIndex }} z {{ suggestions.suggestions.length }}
+            </span>
+            <button
+              type="button"
+              class="ghost-button"
+              (click)="nextSuggestionPage()"
+              [disabled]="suggestionPage >= totalSuggestionPages"
+            >
+              Następne
+            </button>
+          </div>
         </section>
       </aside>
     </section>
@@ -331,8 +352,9 @@
       aria-labelledby="heatmap-title"
       aria-modal="true"
       role="dialog"
+      (scroll)="hideHeatmapTooltip()"
     >
-      <div class="modal-panel heatmap-modal">
+      <div class="modal-panel heatmap-modal" (scroll)="hideHeatmapTooltip()">
         <div class="heatmap-header">
           <div>
             <p class="eyebrow">Dostępność</p>
@@ -370,26 +392,42 @@
                 [ngClass]="'heatmap-level-' + heatmapLevel(day)"
                 [attr.aria-label]="heatmapDayLabel(day)"
                 [attr.tabindex]="day.date && day.isInRange ? 0 : null"
+                (mouseenter)="showHeatmapTooltip(day, $event)"
+                (mouseleave)="scheduleHideHeatmapTooltip()"
+                (focus)="showHeatmapTooltip(day, $event)"
+                (blur)="hideHeatmapTooltip()"
               >
                 <span>{{ day.label }}</span>
                 <ng-container *ngIf="day.date && day.isInRange">
                   <small>{{ heatmapAvailability(day) }}/{{ participantCount }}</small>
-                  <div class="heatmap-tooltip" role="tooltip">
-                    <div class="heatmap-tooltip-group">
-                      <strong>Może</strong>
-                      <span *ngIf="heatmapAvailableParticipants(day).length === 0" class="tooltip-empty">Nikt</span>
-                      <span *ngFor="let login of heatmapAvailableParticipants(day)">{{ login }}</span>
-                    </div>
-                    <div class="heatmap-tooltip-group">
-                      <strong>Nie może</strong>
-                      <span *ngIf="heatmapUnavailableParticipants(day).length === 0" class="tooltip-empty">Nikt</span>
-                      <span *ngFor="let login of heatmapUnavailableParticipants(day)">{{ login }}</span>
-                    </div>
-                  </div>
                 </ng-container>
               </div>
             </div>
           </section>
+        </div>
+
+        <div
+          class="heatmap-tooltip"
+          *ngIf="activeHeatmapTooltip as tooltip"
+          [class.is-above]="tooltip.placement === 'above'"
+          [style.left.px]="tooltip.left"
+          [style.top.px]="tooltip.top"
+          (mouseenter)="keepHeatmapTooltipOpen()"
+          (mouseleave)="hideHeatmapTooltip()"
+          role="tooltip"
+        >
+          <ng-container *ngIf="activeHeatmapTooltipDetails as details">
+            <div class="heatmap-tooltip-group">
+              <strong>Może</strong>
+              <span *ngIf="details.available.length === 0" class="tooltip-empty">Nikt</span>
+              <span *ngFor="let login of details.available">{{ login }}</span>
+            </div>
+            <div class="heatmap-tooltip-group">
+              <strong>Nie może</strong>
+              <span *ngIf="details.unavailable.length === 0" class="tooltip-empty">Nikt</span>
+              <span *ngFor="let login of details.unavailable">{{ login }}</span>
+            </div>
+          </ng-container>
         </div>
       </div>
     </section>

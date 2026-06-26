@@ -383,6 +383,25 @@ textarea {
   margin-top: 18px;
 }
 
+.suggestion-pagination {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.suggestion-pagination span {
+  color: #64706d;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.suggestion-pagination .ghost-button {
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
 .suggestion-controls {
   display: grid;
   gap: 10px;
@@ -457,6 +476,7 @@ textarea {
   .workspace-grid,
   .form-row,
   .manual-add,
+  .suggestion-pagination,
   .event-edit-fields,
   .range-fields {
     grid-template-columns: 1fr;

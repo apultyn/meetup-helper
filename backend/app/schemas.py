@@ -26,6 +26,27 @@ class EventCreate(BaseModel):
         return self
 
 
+class EventUpdate(BaseModel):
+    login: str = Field(min_length=1, max_length=80)
+    start_date: date
+    end_date: date
+    duration_days: int = Field(ge=1, le=365)
+
+    @field_validator("login")
+    @classmethod
+    def strip_login(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.end_date < self.start_date:
+            raise ValueError("Data końca nie może być wcześniejsza niż data początku.")
+        total_days = (self.end_date - self.start_date).days + 1
+        if self.duration_days > total_days:
+            raise ValueError("Długość wydarzenia nie może przekraczać zakresu dat.")
+        return self
+
+
 class ParticipantJoin(BaseModel):
     login: str = Field(min_length=1, max_length=80)
 
@@ -96,12 +117,15 @@ class SuggestionRead(BaseModel):
     duration_days: int
     requested_duration_days: int
     shortened: bool
+    excluded_participants: list[str] = Field(default_factory=list)
+    excluded_participants_count: int = 0
 
 
 class SuggestionResponse(BaseModel):
     event_code: str
     requested_duration_days: int
     used_duration_days: int | None
+    used_excluded_participants_count: int | None = None
     shortened: bool
     suggestions: list[SuggestionRead]
 

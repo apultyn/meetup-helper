@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_DB: ${{ vars.POSTGRES_DB }}
-      POSTGRES_USER: ${{ vars.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_ADMIN_USER: ${{ vars.POSTGRES_ADMIN_USER }}
+      POSTGRES_APP_USER: ${{ vars.POSTGRES_APP_USER }}
+      POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+      POSTGRES_APP_PASSWORD: ${{ secrets.POSTGRES_APP_PASSWORD }}
 
     steps:
       - name: Check out repository

@@ -10,6 +10,11 @@ Przed startem utwórz lokalny plik `.env` na podstawie szablonu i uzupełnij dan
 cp .env.example .env
 ```
 
+Układ kont bazy:
+
+- `POSTGRES_ADMIN_USER` / `POSTGRES_ADMIN_PASSWORD` - konto administracyjne tworzone przez obraz Postgresa,
+- `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` - konto aplikacyjne używane przez backend.
+
 ```bash
 docker compose up --build
 ```
@@ -45,10 +50,20 @@ W repozytorium GitHub trzeba ustawić zmienne i sekrety używane przez workflow 
 Variables (`Settings` -> `Secrets and variables` -> `Actions` -> `Variables`):
 
 - `POSTGRES_DB`
-- `POSTGRES_USER`
+- `POSTGRES_ADMIN_USER`
+- `POSTGRES_APP_USER`
 
 Secrets (`Settings` -> `Secrets and variables` -> `Actions` -> `Secrets`):
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
-- `POSTGRES_PASSWORD`
+- `POSTGRES_ADMIN_PASSWORD`
+- `POSTGRES_APP_PASSWORD`
+
+## Odtworzenie bazy z katalogu danych
+
+Skrypt `recreate-postgres-from-data.sh` usuwa obecny wolumen Postgresa, tworzy bazę od nowa z kontem admina i kontem aplikacyjnym, uruchamia backend żeby utworzył tabele, a potem importuje pliki `events.txt`, `participants.txt` i `blockers.txt` z `DATA_DIR` (domyślnie `/data`).
+
+```bash
+CONFIRM_RECREATE_DATABASE=YES DATA_DIR=/data bash ./recreate-postgres-from-data.sh
+```
